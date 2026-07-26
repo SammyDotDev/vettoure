@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { IconPlus } from "@tabler/icons-react";
+import { SignOutMenuItem } from "@/components/features/owner/components/sign-out-menu-item";
+import { createClient } from "@/utils/supabase/server";
 
 const dummyRequests = [
 	{
@@ -64,10 +66,21 @@ const dummyProperties = [
 	},
 ];
 
-const Dashboard = () => {
+const Dashboard = async () => {
+	const supabase = await createClient();
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+
+	const firstName = (user?.user_metadata?.first_name as string) || "there";
+	const lastName = (user?.user_metadata?.last_name as string) || "";
+	const fullName = [firstName, lastName].filter(Boolean).join(" ");
+	const initials =
+		`${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "O";
+
 	return (
 		<SidebarProvider className="bg-white md:bg-background">
-			<AppSidebar />
+			<AppSidebar name={fullName} initials={initials} />
 
 			<div className="flex flex-col flex-1 w-full md:max-h-screen overflow-hidden">
 				{/* Mobile Header */}
@@ -77,7 +90,7 @@ const Dashboard = () => {
 					</div>
 					<div className="flex items-center gap-2">
 						<span className="font-bold text-xs bg-gray-200 px-2 py-1 rounded-full text-gray-700">
-							CO
+							{initials}
 						</span>
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
@@ -106,9 +119,7 @@ const Dashboard = () => {
 							</DropdownMenuTrigger>
 							<DropdownMenuContent align="end">
 								<DropdownMenuItem>Settings</DropdownMenuItem>
-								<DropdownMenuItem className="text-destructive focus:text-destructive">
-									Log out
-								</DropdownMenuItem>
+								<SignOutMenuItem />
 							</DropdownMenuContent>
 						</DropdownMenu>
 					</div>
@@ -120,7 +131,7 @@ const Dashboard = () => {
 						{/* Greeting (Mobile Only) */}
 						<div className="md:hidden flex flex-col">
 							<h1 className="text-[28px] font-bold text-foreground tracking-tight">
-								Hello, Chidi
+								Hello, {firstName}
 							</h1>
 						</div>
 

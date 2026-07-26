@@ -19,7 +19,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
-import { Loader } from "@mantine/core";
 import { Spinner } from "@/components/ui/spinner";
 import { useRouter } from "next/navigation";
 
@@ -109,60 +108,77 @@ export default function Auth() {
 
 	const router = useRouter();
 
+	// Where a user lands after authenticating, based on their role.
+	// Honors a ?next= param set by the proxy when it bounced them here.
+	const postAuthDestination = (role?: string) => {
+		const next = new URLSearchParams(window.location.search).get("next");
+		if (next?.startsWith("/")) return next;
+		return role === "owner" ? "/owner/dashboard" : "/listing";
+	};
+
 	const onSubmit = handleSubmit(async (data) => {
 		const supabase = createClient();
+
 		if (authMode === AuthMode.LOGIN) {
 			setAuthenticate((prev) => ({ ...prev, loggingIn: true }));
 			const loginData = data as LoginFormData;
-			await supabase.auth
-				.signInWithPassword({
-					email: loginData.email,
-					password: loginData.password,
-				})
-				.then(async (res) => {
-					const { data, error } = res;
-					console.log(data);
-
-					if (error) {
-						toast.error(error.message ?? "Error Signing In");
-						await supabase.auth
-							.resend({
-								type: "signup",
-								email: loginData.email,
-							})
-							.then((res) => {
-								console.log("Resend payload: ", res);
-
-								toast.success("Email Confirmation Link sent", {
-									duration: 10000,
-								});
-							});
-						return;
-					}
-					toast.success("Sign In Successful");
-					router.push("/owner/dashboard");
-					console.log("Login payload:", res);
-				})
-				.catch((error) => {
-					toast.error(error.message ?? "Error Signing In");
-					console.error(error);
-				})
-				.finally(() =>
-					setAuthenticate((prev) => ({ ...prev, loggingIn: false })),
+			try {
+				const { data: session, error } = await supabase.auth.signInWithPassword(
+					{
+						email: loginData.email,
+						password: loginData.password,
+					},
 				);
 
+				if (error) {
+					if (error.code === "email_not_confirmed") {
+						const { error: resendError } = await supabase.auth.resend({
+							type: "signup",
+							email: loginData.email,
+							options: {
+								emailRedirectTo: `${window.location.origin}/auth/confirm`,
+							},
+						});
+						if (resendError) {
+							toast.error(resendError.message);
+						} else {
+							toast.success(
+								"Please confirm your email — a new confirmation link was sent",
+								{ duration: 10000 },
+							);
+						}
+						return;
+					}
+					toast.error(error.message ?? "Error Signing In");
+					return;
+				}
+
+				console.log("ROLE: ", session)
+				toast.success("Sign In Successful");
+        const role = session.user?.user_metadata?.role as string | undefined;
+				// router.push(postAuthDestination(role));
+				router.refresh();
+			} catch (error) {
+				toast.error(
+					error instanceof Error ? error.message : "Error Signing In",
+				);
+				console.error(error);
+			} finally {
+				setAuthenticate((prev) => ({ ...prev, loggingIn: false }));
+			}
 			return;
 		}
 
 		// register
-
 		const registerData = data as RegisterFormData;
 		setAuthenticate((prev) => ({ ...prev, registering: true }));
-		await supabase.auth
-			.signUp({
+		try {
+			const destination = postAuthDestination(registerData.role);
+			const { data: signUpData, error } = await supabase.auth.signUp({
 				email: registerData.email,
 				password: registerData.password,
 				options: {
+					emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(destination)}`,
 					data: {
 						first_name: registerData.firstName,
 						last_name: registerData.lastName,
@@ -170,23 +186,37 @@ export default function Auth() {
 						role: registerData.role,
 					},
 				},
-			})
-			.then((res) => {
-				const { data, error } = res;
-				if (error) {
-					toast.error(error.message ?? "Error Signing Up");
-					return;
-				}
-				console.log("Register payload:", res);
+			});
+
+			if (error) {
+				toast.error(error.message ?? "Error Signing Up");
+				return;
+			}
+
+			// Supabase returns a user with no identities when the email is
+			// already registered (to avoid leaking account existence).
+			if (signUpData.user?.identities?.length === 0) {
+				toast.error("An account with this email already exists. Try logging in.");
+				return;
+			}
+
+			if (signUpData.session) {
+				// Email confirmation disabled — user is signed in immediately
 				toast.success("Sign Up Successful");
-			})
-			.catch((err) => {
-				toast.error(err.message ?? "Error Signing In");
-				console.error(err);
-			})
-			.finally(() =>
-				setAuthenticate((prev) => ({ ...prev, registering: false })),
-			);
+				router.push(destination);
+				router.refresh();
+				return;
+			}
+
+			toast.success("Check your email to confirm your account", {
+				duration: 10000,
+			});
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Error Signing Up");
+			console.error(err);
+		} finally {
+			setAuthenticate((prev) => ({ ...prev, registering: false }));
+		}
 	});
 	return (
 		<div className="w-full flex">
@@ -213,7 +243,10 @@ export default function Auth() {
 			</div>
 			<div className="w-1/2 flex justify-center p-12 min-h-screen bg-[#eceeeb]">
 				<div className="w-full max-w-md flex flex-col min-h-137.5 my-auto justify-start">
-					<form className="w-full mx-auto flex flex-col rounded-xl p-4 bg-white border border-[#eef1ee]">
+					<form
+						onSubmit={onSubmit}
+						className="w-full mx-auto flex flex-col rounded-xl p-4 bg-white border border-[#eef1ee]"
+					>
 						<Tabs
 							className="flex flex-col flex-1 h-full"
 							defaultValue={AuthMode.LOGIN}
@@ -285,13 +318,12 @@ export default function Auth() {
 										</Field>
 									</FieldGroup>
 								</FieldSet>
-								<Loader color={"#000"} size={20} />
 
 								<Button
 									size="lg"
 									className="mt-10"
-									onClick={onSubmit}
 									type="submit"
+									disabled={authenticate.loggingIn}
 								>
 									{authenticate.loggingIn ? <Spinner /> : "Log In"}
 								</Button>
@@ -408,15 +440,15 @@ export default function Auth() {
 											<Controller
 												name="lastName"
 												control={control}
-												render={({ field }) => (
+												render={({ field, fieldState }) => (
 													<>
 														<Input
 															{...field}
 															placeholder="Doe"
 															autoComplete="off"
 														/>
-														{errors.lastName && (
-															<FieldError>{errors.lastName.message}</FieldError>
+														{fieldState.error?.message && (
+															<FieldError>{fieldState.error.message}</FieldError>
 														)}
 													</>
 												)}
@@ -451,13 +483,11 @@ export default function Auth() {
 											<Controller
 												name="phoneNumber"
 												control={control}
-												render={({ field }) => (
+												render={({ field, fieldState }) => (
 													<>
 														<Input {...field} autoComplete="off" />
-														{errors.phoneNumber && (
-															<FieldError>
-																{errors.phoneNumber.message}
-															</FieldError>
+														{fieldState.error?.message && (
+															<FieldError>{fieldState.error.message}</FieldError>
 														)}
 													</>
 												)}
@@ -491,17 +521,15 @@ export default function Auth() {
 											<Controller
 												name="confirmPassword"
 												control={control}
-												render={({ field }) => (
+												render={({ field, fieldState }) => (
 													<>
 														<Input
 															{...field}
 															type="password"
 															autoComplete="off"
 														/>
-														{errors.confirmPassword && (
-															<FieldError>
-																{errors.confirmPassword.message}
-															</FieldError>
+														{fieldState.error?.message && (
+															<FieldError>{fieldState.error.message}</FieldError>
 														)}
 													</>
 												)}
@@ -510,7 +538,12 @@ export default function Auth() {
 									</FieldGroup>
 								</FieldSet>
 
-								<Button size="lg" className="mt-10" onClick={onSubmit}>
+								<Button
+									size="lg"
+									className="mt-10"
+									type="submit"
+									disabled={authenticate.registering}
+								>
 									{authenticate.registering ? <Spinner /> : "Create Account"}
 								</Button>
 							</TabsContent>

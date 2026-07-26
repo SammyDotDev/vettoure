@@ -9,10 +9,27 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
 
-export const AppSidebar = () => {
+type AppSidebarProps = {
+	name?: string;
+	initials?: string;
+};
+
+export const AppSidebar = ({
+	name = "Owner",
+	initials = "O",
+}: AppSidebarProps) => {
 	const pathname = usePathname();
+	const router = useRouter();
+
+	const handleSignOut = async () => {
+		const supabase = createClient();
+		await supabase.auth.signOut();
+		router.push("/auth");
+		router.refresh();
+	};
 
 	const navItems = [
 		{ name: "Overview", href: "/owner/dashboard" },
@@ -51,12 +68,10 @@ export const AppSidebar = () => {
 			<SidebarFooter className="p-6">
 				<div className="flex items-center gap-3">
 					<div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold text-sm">
-						CO
+						{initials}
 					</div>
 					<div className="flex flex-col">
-						<span className="text-sm font-semibold text-white">
-							Chidi Okafor
-						</span>
+						<span className="text-sm font-semibold text-white">{name}</span>
 						<span className="text-[10px] text-gray-400 flex items-center gap-1">
 							<svg
 								className="w-3 h-3 text-green-400"
@@ -73,6 +88,13 @@ export const AppSidebar = () => {
 						</span>
 					</div>
 				</div>
+				<button
+					type="button"
+					onClick={handleSignOut}
+					className="mt-4 w-full text-left text-sm text-gray-400 hover:text-white transition-colors px-1"
+				>
+					Log out
+				</button>
 			</SidebarFooter>
 		</Sidebar>
 	);

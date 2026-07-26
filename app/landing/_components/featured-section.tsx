@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ListingCard, type ListingData } from "./listing-card";
 import { SectionLabel } from "./section-label";
 const FEATURED_LISTINGS: ListingData[] = [
@@ -47,9 +48,9 @@ export function FeaturedSection() {
 		<section className="lg:max-w-7xl sm:mx-10 w-full justify-between items-center lg:mx-auto pt-2 pb-12 px-10">
 			<div className="flex items-baseline justify-between mb-5">
 				<SectionLabel label="featured verified listings" />
-				<span className="font-sans text-sm font-semibold text-[#0f3d2e] cursor-pointer hover:opacity-80 transition-opacity">
+				<Link href={"/browse"} className="font-sans text-sm font-semibold text-[#0f3d2e] cursor-pointer hover:opacity-80 transition-opacity">
 					View all →
-				</span>
+				</Link>
 			</div>
 			<div className="grid grid-cols-4 gap-5">
 				{FEATURED_LISTINGS.map((listing, i) => (

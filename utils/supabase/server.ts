@@ -1,10 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { cache } from 'react'
 
-export async function createClient() {
-
-  console.log(process.env.NEXT_PUBLIC_SUPABASE_URL);
-  console.log(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+// cache() memoizes per request: every call site in the same request shares
+// one client instance. A module-level singleton would be shared across
+// concurrent users' requests and leak sessions between them.
+export const createClient = cache(async () => {
   const cookieStore = await cookies()
 
   return createServerClient(
@@ -29,4 +30,4 @@ export async function createClient() {
       },
     }
   )
-}
+})
