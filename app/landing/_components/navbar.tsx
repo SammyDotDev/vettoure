@@ -25,19 +25,19 @@ export async function Navbar() {
       <div className="flex flex-col-reverse items-end md:flex-row lg:items-center gap-4 sm:gap-7 font-sans text-sm font-medium text-[#4d5a54]">
         <div className="flex flex-col items-end lg:flex-row lg:items-center gap-4">
           <Link
-            href="/listing"
-            className="hover:text-foreground transition-colors"
-          >
-            Browse
-          </Link>
-          <Link
             href="/#how-it-works"
             className="hover:text-foreground transition-colors"
           >
             How it works
           </Link>
           <Link
-            href="/auth"
+            href="/listing"
+            className="hover:text-foreground transition-colors"
+          >
+            Browse
+          </Link>
+          <Link
+            href="/auth?role=owner"
             className="hover:text-foreground transition-colors"
           >
             For owners
@@ -49,14 +49,6 @@ export async function Navbar() {
             isOwner={user?.user_metadata?.role === "owner"}
           />
         ) : (
-          <Link
-            href="/auth/"
-            className="text-[#0f3d2e] font-semibold hover:opacity-80 transition-opacity"
-          >
-            Log in
-          </Link>
-        )}
-        {!isLoggedIn && (
           <Button
             asChild
             className="w-auto font-sans px-[18px] py-2.5 rounded-[9px] text-sm font-semibold"
