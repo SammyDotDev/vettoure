@@ -1,6 +1,4 @@
-import { log } from "console";
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "./server";
 import { createServerClient } from "@supabase/ssr";
 
 export async function updateSession(request: NextRequest) {
@@ -35,9 +33,7 @@ export async function updateSession(request: NextRequest) {
 	// issues with users being randomly logged out.
 	const {
 		data: { user },
-  } = await supabase.auth.getUser()
-
-  console.log(user)
+	} = await supabase.auth.getUser();
 
 	const { pathname } = request.nextUrl;
 	const role = user?.user_metadata?.role as string | undefined;
@@ -65,8 +61,13 @@ export async function updateSession(request: NextRequest) {
 		}
 	}
 
-	// Signed-in users have no business on the auth screen
+	// Signed-in users have no business on the auth screen; honor ?next= when
+	// it points somewhere safe, otherwise send them to their role's home.
 	if (pathname === "/auth" && user) {
+		const next = request.nextUrl.searchParams.get("next");
+		if (next?.startsWith("/") && !next.startsWith("//")) {
+			return redirectTo(next);
+		}
 		return redirectTo(role === "owner" ? "/owner/dashboard" : "/listing");
 	}
 
