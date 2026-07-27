@@ -108,6 +108,17 @@ export default function Auth() {
 
   const router = useRouter();
 
+  // Deep link: /auth?role=owner opens the Register tab with that role
+  // preselected (used by the "For owners" navbar link).
+  useEffect(() => {
+    const role = new URLSearchParams(window.location.search).get("role");
+    if (role === "owner" || role === "buyer") {
+      setAuthMode(AuthMode.REGISTER);
+      reset({ ...registerDefaultValues, role });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Where a user lands after authenticating, based on their role.
   // Honors a ?next= param set by the proxy when it bounced them here.
   const postAuthDestination = (role?: string) => {
@@ -258,7 +269,7 @@ export default function Auth() {
           >
             <Tabs
               className="flex flex-col flex-1 h-full"
-              defaultValue={AuthMode.LOGIN}
+              value={authMode}
               onValueChange={(val) => {
                 const mode = val as AuthMode;
                 setAuthMode(mode);
